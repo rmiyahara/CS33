@@ -1,0 +1,77 @@
+1) With -O2
+testovf:
+	xorl	%eax, %eax
+	ret
+
+This assembly code always returns false because of the xorl with itself. The
+compiler knows, since there is no fwrap, that the expression will always return
+false. A positive argument (right side) will always will always be less than or
+equal to the left side argument. A negative value will always be less than the
+right hand side.
+
+2) With -O2 -fwrapv
+testovf:
+	movabsq	$9223372036854775807, %rax
+	addq	%rdi, %rax
+	cmpq	%rdi, %rax
+	setl	%al
+	ret
+
+The fwrapv flag lets the compiler know to allow wrap around arithmetic overflow.
+By adding the argument with LONG_MAX, we can compare the values to check for
+overflow. This is seen in the cmpq line. This is different from the first
+function because the compiler allows arithmetic to overflow in cases where the
+argument is positive as compared to the first, where overflow is prohibited.
+
+3) With -O2 -fsanitize=undefined
+testovf:
+	pushq	%rbp
+	pushq	%rbx
+	movabsq	$9223372036854775807, %rdx
+	movq	%rdi, %rbp
+	movq	%rdi, %rbx
+	subq	$8, %rsp
+	addq	%rdx, %rbp
+	jo	.L6
+.L2:
+	cmpq	%rbx, %rbp
+	setl	%al
+	addq	$8, %rsp
+	popq	%rbx
+	popq	%rbp
+	ret
+.L6:
+	movq	%rdi, %rsi
+	movl	$.Lubsan_data0, %edi
+	call	__ubsan_handle_add_overflow
+	jmp	.L2
+	.size	testovf, .-testovf
+	.section	.rodata.str1.1,"aMS",@progbits,1
+.LC0:
+	.string	"testovf.c"
+	.data
+	.align 16
+	.type	.Lubsan_data0, @object
+	.size	.Lubsan_data0, 24
+.Lubsan_data0:
+	.quad	.LC0
+	.long	5
+	.long	14
+	.quad	.Lubsan_type0
+	.align 2
+	.type	.Lubsan_type0, @object
+	.size	.Lubsan_type0, 15
+.Lubsan_type0:
+	.value	0
+	.value	13
+	.string	"'long int'"
+	.ident	"GCC: (GNU) 7.2.0"
+	.section	.note.GNU-stack,"",@progbits
+
+With the undefined flag, the program must make a case for overflow and notify
+the user if this case has been used. This is labelled L6 and is jumped to
+if the overflow flag has been set. If overflow has occured, the funciton
+__ubsan_handle_add_overflow is called to notify the user, then the program jumps
+to the no overflow case. This is different from the first 2 because it handles
+overflow as another case all together while the other 2 have it as part of the
+known behavior.

@@ -1,0 +1,18 @@
+12.17
+A) The program does not print anything because the main thread continues to
+follow the code in parallel to the thread that is supposed to sleep. This
+creates a race conditionb where the main thread exits and ends the entire
+program.
+
+B) You can replace exit with the following two functions:
+int pthread_cancel(pthread_t tid)
+int pthread_join(pthjread_t tid, void **thread_return)
+These would work because they force the parent thread to wait until the child
+thread completes before shutting it down and ending the program.
+
+12.25
+The function echo_cnt is thread-safe because, although it uses outside
+variables, they are protected with a mutex (lines 22 & 26). The P and V
+functions make sure that the shared variable does not set up a race condition.
+This function is not reentrant because it uses shared data. The shared mutex is
+thread safe, but it is still shared.

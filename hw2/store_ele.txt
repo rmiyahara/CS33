@@ -1,0 +1,15 @@
+A. Below is equation 3.1 for the array D[R][S] where L is the size of the type
+of D.
+3.1) &D[i][j] = x_d + L(S * i + j)
+We can extend the equation to three dimensions for the array D[R][S][T]
+&D[i][j][k] = x_d + L(S * T * i + T * j + k)
+This equation was found by drawing the stack similarly to Figure 3.36, except
+with an added T dimension. After writing out multiple addresses I solved using
+a system of equations.
+
+B. By walking through the assembly code, we can find that dest points to the
+expression A + 8(65i + 13j + k). By aligning this with our equation from part
+A, we know that S = 5 and T = 13. The function store_ele returns a value of
+3640. Since this stores long values, each value has a byte size of 8 (L). We can
+then set up the equation 3640 = 8(RST). By plugging in our values for S and T,
+we solve that R = 7.

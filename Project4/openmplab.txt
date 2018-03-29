@@ -1,0 +1,243 @@
+Setup
+To begin the set up for this lab, I first downloaded the "OpenMP Lab Material"
+from the CCLE site for this class. Next, I created a directory on my machine as
+well as on my SEAS Net account labeled "Project4". Next, I copied the tarball
+onto the Linux server and unzipped it. I then created a 'README.txt' with my
+name and UCID. Next, as suggested by TA Mehdi, I changed the following lines in
+MakeFile:
+
+SRC	=	filter.c
+SRCS = $(SRC) main.c func.c util.c
+
+to the following respectively:
+
+SRC	=	func.c
+SRCS = $(SRC) main.c filter.c util.c
+
+This allows the following command to work properly:
+
+$ make	___	SRC=myfunc.c
+
+Next, I ran the following command to obtain my base times:
+
+$ make seq
+$ ./seq
+
+This gave me the following:
+
+FUNC TIME : 0.584216
+TOTAL TIME : 2.609048
+
+Next, I ran the following commands to obtain my time breakdown:
+
+$ make omp
+$ gprof omp | less
+
+This gave me the following output:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total
+ time   seconds   seconds    calls  ms/call  ms/call  name
+ 73.11      0.46     0.46  5177424     0.00     0.00  func1
+ 12.71      0.54     0.08        1    80.10    80.10  func2
+  3.18      0.56     0.02   491520     0.00     0.00  addSeed
+  3.18      0.58     0.02                             func3
+  1.59      0.59     0.01       16     0.63     6.33  func0
+  1.59      0.60     0.01        2     5.01     5.01  func5
+  1.59      0.61     0.01                             filter
+  1.59      0.62     0.01                             init
+  1.59      0.63     0.01                             rand2
+  0.00      0.63     0.00       17     0.00     0.00  func4
+
+This shows that my current bottle neck is at func1.
+
+Changelog
+My first objective was to optimize func1 since it was taking up a majority of my
+time percentage. I split up the first loop containing arrayX[i] and arrayY[i]
+into 2 separate loops to maintain spatial locality. Next, I analyzed the bigger
+loop following the first one. I added this above the leave:
+
+#pragma omp parallel for private(index_X, index_Y, j)
+
+This allows the loop to run with multiple threads. The private variables make
+sure different threads do not interfere with the private variables. This gives
+each thread its own version of each variable. After running this, I checked the
+time breakdown of my program using the following commands:
+
+$ make omp GPROF=1
+$ gprof omp | less
+
+This showed me that my current bottle neck was now func0. I decided to change
+the main loop into three separate loops to maintain spatial locality. After
+this, I decided to check my performance. This gave me the following:
+
+FUNC TIME : 0.273698
+TOTAL TIME : 2.768356
+
+I then thought that maybe the default 32 strings wasn't optimal. I then tried it
+with the values 4, 8, 16, and 24. I implemented this by adding the following
+line of code before every #programa line.
+
+omp_set_num_threads(x); //x was the testing number of threads
+
+This gave me the following results:
+
+Thread #4
+FUNC TIME : 0.161619
+TOTAL TIME : 2.380032
+
+Thread #8
+FUNC TIME : 0.104563
+TOTAL TIME : 1.876825
+
+Thread #24
+FUNC TIME : 0.089759
+TOTAL TIME : 2.525878
+
+This told me that 24 was optimal. After changing the numbers around (betweewn
+24 and 32) I found that 24 was optimal. Next I found my function breakdown
+after these changes were applied. This gave me the following.
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total
+ time   seconds   seconds    calls  ms/call  ms/call  name
+ 55.06      0.33     0.33                             filter
+ 26.70      0.49     0.16  4582837     0.00     0.00  rand2
+ 10.01      0.55     0.06        1    60.07   206.66  addSeed
+  3.34      0.57     0.02        1    20.02    20.02  imdilateDisk
+  3.34      0.59     0.02                             sequence
+  1.67      0.60     0.01   491520     0.00     0.00  findIndexBin
+  0.00      0.60     0.00   444358     0.00     0.00  round
+  0.00      0.60     0.00       16     0.00     0.00  dilateMatrix
+  0.00      0.60     0.00       15     0.00     0.00  func1
+  0.00      0.60     0.00       15     0.00     0.00  func2
+  0.00      0.60     0.00       15     0.00     0.00  func3
+  0.00      0.60     0.00       15     0.00     0.00  func4
+  0.00      0.60     0.00       15     0.00     0.67  func5
+  0.00      0.60     0.00       15     0.00     0.00  rand1
+  0.00      0.60     0.00        2     0.00     0.00  get_time
+  0.00      0.60     0.00        1     0.00     0.00  elapsed_time
+  0.00      0.60     0.00        1     0.00     0.00  fillMatrix
+  0.00      0.60     0.00        1     0.00     0.00  func0
+
+The final time for this was the following:
+
+FUNC TIME : 0.084825
+TOTAL TIME : 2.146515
+
+This calculates and gives me a 6.9x speed up multiplier.
+
+Next, I decided to work on func5. First, I allowed the first 'for' loop to run
+with 24 threads while setting 'i' as a private variable. It must be set as
+private because each thread will come up with a unique value for i. After this,
+I separated the second 'for' loop into three separate loops for spatial
+locality. I then enables each of these loops with 24 threads. For the last loop
+involving weight[i], I initialized a variable nf which set itself to a double
+cast for n. This way, n would only have to be cast as a double once rather than
+each time the loop ran. I then checked the time using the "$ make omp" command
+and got the following output.
+
+FUNC TIME : 0.057651
+TOTAL TIME : 2.510867
+
+This gives me a 10.1x multiplier.
+
+After this, I decided to work on func4. For this small function,
+I made a variable nf which was n casted as a double just like func5. Next, I
+enabled threads for the loop at a count of 24. This gave me the following:
+
+FUNC TIME : 0.066761
+TOTAL TIME : 2.262980
+
+Although this is a slowdown, it was performed at a different time than the
+other changes. The program without these changes was slower at this time as
+well. I checked my time breakdown again and got the following:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total
+ time   seconds   seconds    calls  ms/call  ms/call  name
+ 67.42      0.33     0.33                             filter
+ 16.34      0.41     0.08  4232210     0.00     0.00  rand2
+  8.17      0.45     0.04    15401     0.00     0.00  findIndexBin
+  4.09      0.47     0.02                             sequence
+  2.04      0.48     0.01        1    10.01    89.37  addSeed
+  2.04      0.49     0.01        1    10.01    10.01  imdilateDisk
+  0.00      0.49     0.00    67527     0.00     0.00  round
+  0.00      0.49     0.00       16     0.00     0.00  dilateMatrix
+  0.00      0.49     0.00       15     0.00     0.00  func1
+  0.00      0.49     0.00       15     0.00     0.00  func2
+  0.00      0.49     0.00       15     0.00     0.00  func3
+  0.00      0.49     0.00       15     0.00     0.00  func4
+  0.00      0.49     0.00       15     0.00     0.00  func5
+  0.00      0.49     0.00       15     0.00     0.00  rand1
+  0.00      0.49     0.00        2     0.00     0.00  get_time
+  0.00      0.49     0.00        1     0.00     0.00  elapsed_time
+  0.00      0.49     0.00        1     0.00     0.00  fillMatrix
+  0.00      0.49     0.00        1     0.00     0.00  func0
+
+Since func2 was the next biggest bottleneck I hadn't worked on yet, I decided to
+work on it next. To begin, I enabled threads for the first and last loop. I set
+the number of threads to 24 as usual. Next I set up an accumulator above the
+second loop with the following line of code:
+
+#pragma omp parallel for reduction(+:sumWeights)
+
+I did this so that each thread will know to properly accumulate the variable.
+After this, I checked my time and got the following output:
+
+FUNC TIME : 0.038492
+TOTAL TIME : 1.988817
+
+This gives me a 15.2x speed up.
+
+Lastly, I decided to work on func3 since it is the only function I had not
+worked on yet. I split added an accumulator to the loop as I did in the previous
+function. When I compiled this, I got a syntax error and decided to split the
+loop into 2 separate loops with their respective accumulators. I then checked
+the time for this change and recieved the following.
+
+FUNC TIME : 0.037405
+TOTAL TIME : 1.971257
+
+This gives me a speed up of 15.6x.
+
+After each change, I checked my output using the following command:
+
+$ make check
+
+Which always gave me the following:
+
+diff --brief correct.txt output.txt
+
+I also attempted to do memory checks, but Yu-Chen mentioned that this did not
+work and raised incorrect warnings.
+
+Now that I finished editing all 6 functions, I decided to do a final time and
+breakdown check. These gave me the following.
+
+FUNC TIME : 0.037405
+TOTAL TIME : 1.971257
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total
+ time   seconds   seconds    calls  ms/call  ms/call  name
+ 60.40      0.35     0.35                             filter
+ 24.16      0.49     0.14  4228474     0.00     0.00  rand2
+  6.90      0.53     0.04    13406     0.00     0.00  findIndexBin
+  5.18      0.56     0.03                             sequence
+  1.73      0.57     0.01        1    10.01   149.00  addSeed
+  1.73      0.58     0.01        1    10.01    10.01  imdilateDisk
+  0.00      0.58     0.00    50170     0.00     0.00  round
+  0.00      0.58     0.00       16     0.00     0.00  dilateMatrix
+  0.00      0.58     0.00       15     0.00     0.00  func1
+  0.00      0.58     0.00       15     0.00     0.00  func2
+  0.00      0.58     0.00       15     0.00     0.00  func3
+  0.00      0.58     0.00       15     0.00     0.00  func4
+  0.00      0.58     0.00       15     0.00     0.00  func5
+  0.00      0.58     0.00       15     0.00     0.00  rand1
+  0.00      0.58     0.00        2     0.00     0.00  get_time
+  0.00      0.58     0.00        1     0.00     0.00  elapsed_time
+  0.00      0.58     0.00        1     0.00     0.00  fillMatrix
+  0.00      0.58     0.00        1     0.00     0.00  func0
+
+The final iteration of my project gave me a speed up of 15.62x.

@@ -1,0 +1,29 @@
+A. This inequality always returns 1. The reason for this is, if a number (x) is
+greater than another number (y), when both sides are multiplied by -1, the sign
+of the inequality will be reversed.
+
+B. This inequality also always returns 1. This is because, the right shift
+multiplies the sum by 2^4. After adding the rest of the left side, we get an
+expression equal to the right side.
+
+C. This inequality isn't always true. This is because, due to De Morgan's laws,
+~(x + y) = ~x * ~y which does not equal the left side. A test case that proves
+this is (x = -5, y = -5,).
+
+D. This inequality isn't always true either. Since the right side (y - x) is an
+integer, if it overflows, then is cast as an unsigned after, the result will be
+different than if both were unsigned originally, A test case for this would be
+(x = -2^31 - 1, y = 1,).
+
+E. This inequality will always return 1. This is because, on the left side, if
+we right shift, then left shift, we can only lose 1s. This means when we left
+shift afterwards, the bits that potentially had 1s are now 0s. The left side
+will now be less than or equal to the original value.
+
+F. This inequality will also always hold true. This is because, since the right
+side is cast to unsigned, when the inequality is checked, the left side will be
+implicitly cast to unsigned. Making the left equal the right every time.
+
+G. This is not always true. If x is assigned to any negative number, the right
+will always yield a positive number while the remainder can be negative. A test
+case for this is (x = -1).

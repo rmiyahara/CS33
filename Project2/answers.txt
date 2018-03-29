@@ -1,0 +1,37 @@
+1) The instruction in the in the trace that causes an incorrect mathematical
+answer is the lea instruciton. It multiplies the high number and shifts the
+answer which results in data loss.
+
+2) Going through the Emacs files, we find the following definitions:
+
+#define MOST_POSITIVE_FIXNUM (EMACS_INT_MAX >> INTTYPEBITS)
+
+#ifndef EMACS_INT_MAX
+# if INTPTR_MAX <= 0
+#  error "INTPTR_MAX misconfigured"
+# elif INTPTR_MAX <= INT_MAX && !defined WIDE_EMACS_INT
+
+#define MOST_NEGATIVE_FIXNUM (-1 - MOST_POSITIVE_FIXNUM)
+
+Looking at these definitions, we can tell MOST_NEGATIVE_FIXNUM is related to
+MOST_POSITIVE_FIXNUM. The value we would expect for this would be ~((-2) << 63).
+Although, due to the flagging system, we shift the value over by 2 giving us the
+printed number.
+
+3) By looking at the max number (defined above) and multiplying the result by
+hand, we find the answer to have a MSB of 8, a LSB of 1, and 0's filling the
+remaining hex bytes. After Elisp shifts off the MSB, we have a remaining value
+of 4. Although, after the second 2 right shifts, this value can now be read
+as 1.
+
+4) Using -fwrapv doesn't affect the overflow flag. As seen in trace.tr,
+arithmetic_driver relies on the overflow flag rather than overflow behavior.
+This means using -fwrapv wouldn't affect the program at all.
+
+5) On a low assembly level, the issue arises from the following command.
+
+movdqu %xmm7,-0x10(%rdi)
+
+This moves a 16 byte piece into an 8 byte slot. This causes memory that is not
+meant to be overwritten to be overwritten. This corrupt data which will be
+called on later, crashing the code. 

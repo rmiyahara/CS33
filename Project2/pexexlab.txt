@@ -1,0 +1,49 @@
+To open the lab I entered the following command
+linux> gbd ~eggert/bin64/bin/emacs-25.2
+onto the Linux 09 server. This put me into GDB. I then used the following
+commands
+
+linux> set disassemble-next-line on
+linux> break Ftimes
+linus> run 12 10
+
+The first two lines went through without any message, but the last one gave a
+large block of text with unknown meaning. The product of the 2 arguments
+followed. I then followed through the program by using the "n" command followed
+by the "info register" command to view the changes to each register after each
+block of commands. After 72 lines of code, I repeated this process with the
+following cases.
+
+linux> run 1250284240 -1844255039
+linux> run 10 10
+linux> run 1 1
+
+The first case had the shortest assembly. The product was not printed as in the
+12 10 case.
+
+The next case was longer than the 12 10 case. There appeared to be a loop that
+ran around multiple times. The product was printed in this case unlike the
+previous one.
+
+In the third case, the product was not printed again. And the following code
+was similar to the 12 10 case.
+
+Following these three cases, I ran the 12 10 case and began trace.tr. I ran the
+whole code while copy and pasting the instructions into trace.tr. I followed
+this until arithmetic_driver returned (when Ftimes returned). I then went
+through the program a second time using the "info register" command and recorded
+changes in the registers corresponding to the mov, add, sub, push, pop, and
+imult commands. For the push and pop commands, I calculated the individual push
+pop commands and wrote their hex addresses in trace.tr's fourth column. Each
+step was calculated knowing that the push command is equivalent to:
+
+subq $8, %rsp
+movq [target], %rsp
+
+and a pop is equivalent to:
+
+movq %rsp, [target]
+addq $8, %rsp
+
+I could then check these addresses with the final address of the stack pointer
+using the "info register" command.

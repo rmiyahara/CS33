@@ -1,0 +1,14 @@
+By observing the assembly lines, and drawing the memory diagrams for str1 and
+str2, I found the following 4 equations.
+
+1) B + buffer1 = 8
+2) B + buffer1 + 4 + 2A + buffer2 = 32
+3) 4AB + buffer3 = 184
+4) buffer1 = (4 - B%4); //if equal to 4, this is changed to 0
+5) buffer2 = (8 - 2A%8); //if this is equal to 8, this is changed to 0
+6) buffer3 = (8 - 4AB%8); If this is equal to 8, this is changed to 0
+
+By solving these system of equations, I got the following values.
+A = 9;
+B = 5;
+I checked these values by plugging them back into the equations.

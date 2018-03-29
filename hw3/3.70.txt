@@ -1,0 +1,14 @@
+A. Since pointers, and longs all use 8 bytes the following are the offsets.
+e1.p = 0;
+e1.y = 8;
+e2.x = 0;
+e3.next = 8;
+
+B. Since a union holds its components side by side, this structure only requires
+16 bytes.
+
+C. By observing each line of assembly and checking for aliasing errors, I
+obtained the following.
+void proc (union ele *up) {
+  up->e2.next->e1.y = *((next.e1).p) - (up->e2).x;
+}

@@ -1,0 +1,9 @@
+A. The inequality in the copy_int function is ineffective due to sizeof(val)
+returning a size_t type. This type cannot be negative which prevents the left
+side of the inequality from being negative.
+
+B. void copy_int(int val; void *buf, int maxbytes) {
+      x = sizeof(val);
+      if (maxbytes >= sizeof(val))
+        memcpy(buf, (void•) &val, sizeof(val));
+    }

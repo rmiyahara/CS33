@@ -1,0 +1,17 @@
+A. False, in the case that x = TMax, the left side will be NaN while the int
+to double cast on the right ill give a valid number. the answer will be
+rounded when cast to a float after. NaN != any number.
+
+B. False, if x = TMin and y is any positive numberm the right will overflow
+while the left side does not.
+
+C. True, since a double has twice the amount of bytes of an int, we can never
+overflow. This means addition starting with any two factors will be the same.
+
+D. False, if x = TMax, y = TMax - 2, and dz = 2^-1, the left side would
+produce a rounding error in the first operation while it would be produced in
+the second operation on the right. The rounding errors will more often than
+not, be different.
+
+E. False, if x = 0 and z = any number, the left would equal NaN while the right
+would equal 1.
